@@ -66,9 +66,7 @@ if (CMAKE_CXX_COMPILER MATCHES "/em\\+\\+(-[a-zA-Z0-9.])?$")
   set(NANOGUI_BUILD_GLAD_DEFAULT   OFF)
   set(NANOGUI_BUILD_GLFW_DEFAULT   OFF)
 
-  set(CMAKE_STATIC_LIBRARY_SUFFIX ".bc")
-  set(CMAKE_EXECUTABLE_SUFFIX ".bc")
-  set(CMAKE_CXX_CREATE_STATIC_LIBRARY "<CMAKE_CXX_COMPILER> -o <TARGET> <LINK_FLAGS> <OBJECTS>")
+  set(CMAKE_EXECUTABLE_SUFFIX ".html")
   if (U_CMAKE_BUILD_TYPE MATCHES REL)
     add_compile_options(-O3 -DNDEBUG)
   endif()
@@ -273,7 +271,7 @@ endif()
 
 # Required core libraries on various platforms
 if (${CMAKE_CXX_COMPILER_ID} MATCHES "Emscripten")
-  # No dependencies
+  list(APPEND NANOGUI_LIBS "-s USE_GLFW=3")
 elseif (WIN32)
   list(APPEND NANOGUI_LIBS opengl32)
 elseif (APPLE)
@@ -427,6 +425,12 @@ add_library(nanogui ${NANOGUI_LIBRARY_TYPE}
   include/nanogui/nanogui.h
 )
 
+# Defines various CMAKE_INSTALL_* variables used below in $<INSTALL_INTERFACE>.
+if (NANOGUI_INSTALL)
+  include(GNUInstallDirs)
+endif()
+
+
 target_compile_definitions(nanogui
   PUBLIC
     ${NANOGUI_BACKEND_DEFS}
@@ -497,6 +501,12 @@ if (EXISTS /opt/vc/include)
   target_include_directories(nanogui PUBLIC /opt/vc/include)
 endif()
 
+# Find glfw if nanogui is not compiling it internally.
+if (NOT NANOGUI_BUILD_GLFW AND NOT EMSCRIPTEN)
+  find_package(glfw3 CONFIG REQUIRED)
+  target_link_libraries(nanogui PUBLIC glfw)
+endif()
+
 if (NANOGUI_INSTALL)
   install(TARGETS nanogui
           LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -521,6 +531,8 @@ if (NANOGUI_INSTALL)
   install(TARGETS nanogui EXPORT nanoguiTargets)
 
   set(NANOGUI_CMAKECONFIG_INSTALL_DIR "${CMAKE_INSTALL_DATAROOTDIR}/cmake/nanogui")
+
+  include(CMakePackageConfigHelpers) 
 
   configure_package_config_file(
     resources/nanoguiConfig.cmake.in nanoguiConfig.cmake
